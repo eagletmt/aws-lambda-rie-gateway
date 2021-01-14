@@ -67,7 +67,7 @@ struct ApiGatewayV2LambdaResponseV1 {
     is_base64_encoded: bool,
     status_code: u16,
     #[serde(default)]
-    headers: std::collections::HashMap<Vec<u8>, String>,
+    headers: std::collections::HashMap<String, String>,
     body: String,
 }
 
@@ -132,7 +132,7 @@ async fn handle(
 
     let mut builder = hyper::Response::builder().status(lambda_response.status_code);
     for (k, v) in lambda_response.headers {
-        builder = builder.header(k.as_slice(), v);
+        builder = builder.header(k.as_bytes(), v);
     }
     Ok(builder.body(hyper::Body::from(lambda_response.body))?)
 }
