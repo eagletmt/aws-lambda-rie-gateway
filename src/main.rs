@@ -1,17 +1,36 @@
 use futures::stream::TryStreamExt as _;
+use structopt::StructOpt as _;
+
+#[derive(Debug, structopt::StructOpt)]
+struct Opt {
+    #[structopt(short, long, default_value = "127.0.0.1:8080", about = "Bind address")]
+    bind: String,
+    #[structopt(
+        short,
+        long,
+        default_value = "http://localhost:9000",
+        about = "Target root URL of RIE"
+    )]
+    target_url: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    let Opt { bind, target_url } = Opt::from_args();
 
-    let make_service = hyper::service::make_service_fn(|_| async {
-        Ok::<_, std::convert::Infallible>(hyper::service::service_fn(handle))
+    let make_service = hyper::service::make_service_fn(move |_| {
+        let target_url = target_url.clone();
+        async {
+            Ok::<_, std::convert::Infallible>(hyper::service::service_fn(move |r| {
+                handle(target_url.clone(), r)
+            }))
+        }
     });
     let server = if let Some(listener) = listenfd::ListenFd::from_env().take_tcp_listener(0)? {
         hyper::server::Server::from_tcp(listener)?
     } else {
-        let addr = "127.0.0.1:8080".parse()?;
-        hyper::server::Server::bind(&addr)
+        hyper::server::Server::bind(&bind.parse()?)
     }
     .serve(make_service);
     server.await?;
@@ -53,6 +72,7 @@ struct ApiGatewayV2LambdaResponseV1 {
 }
 
 async fn handle(
+    target_url: String,
     request: hyper::Request<hyper::Body>,
 ) -> Result<hyper::Response<hyper::Body>, anyhow::Error> {
     let query_string_parameters = if request.uri().query().is_some() {
@@ -100,7 +120,10 @@ async fn handle(
         serde_json::to_string(&payload)?
     );
     let resp = reqwest::Client::new()
-        .post("http://localhost:9000/2015-03-31/functions/function/invocations")
+        .post(&format!(
+            "{}/2015-03-31/functions/function/invocations",
+            target_url
+        ))
         .json(&payload)
         .send()
         .await?;
