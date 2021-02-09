@@ -8,3 +8,8 @@ Convert HTTP request to API Gateway payload for [aws-lambda-rie](https://github.
         - https://github.com/aws/aws-lambda-runtime-interface-emulator
 2. Start aws-lambda-rie-gateway: `cargo run`
 3. Then you can access Lambda for API Gateway with normal HTTP request: `curl http://localhost:8080/hello`
+
+# Usage Docker Image
+1. Clone this repository
+2. Then `docker build --tag aws-lambda-rie-gateway`
+3. Execute with `docker run --rm --env TARGET_URL=http://rie_app:8080 --publish 8080:8080 aws-lambda-rie-gateway`
