@@ -10,6 +10,10 @@ Convert HTTP request to API Gateway payload for [aws-lambda-rie](https://github.
 3. Then you can access Lambda for API Gateway with normal HTTP request: `curl http://localhost:8080/hello`
 
 # Usage Docker Image
+## From container registry
+1. Run `docker run --rm --env TARGET_URL=http://rie_app:8080 --publish 8080:8080 ghcr.io/eagletmt/aws-lambda-rie-gateway`
+
+## From source
 1. Clone this repository
 2. Then `docker build --tag aws-lambda-rie-gateway`
 3. Execute with `docker run --rm --env TARGET_URL=http://rie_app:8080 --publish 8080:8080 aws-lambda-rie-gateway`
