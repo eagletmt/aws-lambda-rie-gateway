@@ -8,7 +8,7 @@ on:
       - v*
 
 env:
-  IMAGE_NAME: aws-lambda-rie-gateway
+  IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/aws-lambda-rie-gateway
 
 jobs:
   push:
@@ -19,14 +19,13 @@ jobs:
 
       - name: Pull images for caching
         run: |
-          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
-          docker pull $IMAGE_ID:stage-builder || true
-          docker pull $IMAGE_ID:latest || true
+          docker pull $IMAGE_REPO:stage-builder || true
+          docker pull $IMAGE_REPO:latest || true
 
       - name: Build image
         run: |
-          docker build . --tag stage-builder --target builder --cache-from $IMAGE_ID:stage-builder
-          docker build . --tag $IMAGE_NAME --cache-from stage-builder --cache-from $IMAGE_ID:latest
+          docker build . --tag $IMAGE_REPO:stage-builder --target builder --cache-from $IMAGE_REPO:stage-builder
+          docker build . --tag $IMAGE_REPO:latest --cache-from $IMAGE_REPO:stage-builder --cache-from $IMAGE_REPO:latest
 
       - name: Log into registry
         run: echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -42,11 +41,8 @@ jobs:
           # Use Docker `latest` tag convention
           [ "$VERSION" == "main" ] && VERSION=latest
 
-          echo IMAGE_ID=$IMAGE_ID
           echo VERSION=$VERSION
 
-          docker tag stage-builder $IMAGE_ID:stage-builder
-          docker push $IMAGE_ID:stage-builder
-
-          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
-          docker push $IMAGE_ID:$VERSION
+          docker push $IMAGE_REPO:stage-builder
+          docker tag $IMAGE_REPO:latest $IMAGE_REPO:$VERSION
+          docker push $IMAGE_REPO:$VERSION
