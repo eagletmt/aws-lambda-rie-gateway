@@ -13,9 +13,9 @@ RUN cargo build --release --locked --frozen
 FROM alpine:latest
 LABEL org.opencontainers.image.source https://github.com/eagletmt/aws-lambda-rie-gateway
 
-ENV GATEWAY_PORT=8080
+ENV BIND 0.0.0.0:8080
 
-EXPOSE $GATEWAY_PORT
-ENTRYPOINT aws-lambda-rie-gateway --bind 0.0.0.0:$GATEWAY_PORT --target-url $TARGET_URL
+EXPOSE 8080
 
 COPY --from=builder /usr/local/src/aws-lambda-rie-gateway/target/release/aws-lambda-rie-gateway /usr/local/bin/aws-lambda-rie-gateway
+ENTRYPOINT ["aws-lambda-rie-gateway"]

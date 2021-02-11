@@ -3,11 +3,18 @@ use structopt::StructOpt as _;
 
 #[derive(Debug, structopt::StructOpt)]
 struct Opt {
-    #[structopt(short, long, default_value = "127.0.0.1:8080", about = "Bind address")]
+    #[structopt(
+        short,
+        long,
+        env,
+        default_value = "127.0.0.1:8080",
+        about = "Bind address"
+    )]
     bind: String,
     #[structopt(
         short,
         long,
+        env,
         default_value = "http://localhost:9000",
         about = "Target root URL of RIE"
     )]
@@ -28,11 +35,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
     let server = if let Some(listener) = listenfd::ListenFd::from_env().take_tcp_listener(0)? {
+        log::info!("Listen {}", listener.local_addr()?);
         hyper::server::Server::from_tcp(listener)?
     } else {
-        hyper::server::Server::bind(&bind.parse()?)
+        let addr = bind.parse()?;
+        log::info!("Listen {}", addr);
+        hyper::server::Server::bind(&addr)
     }
-    .serve(make_service);
+    .serve(make_service)
+    .with_graceful_shutdown(async {
+        let _ = tokio::signal::ctrl_c().await;
+        log::info!("Shutting down...");
+        ()
+    });
     server.await?;
     Ok(())
 }
