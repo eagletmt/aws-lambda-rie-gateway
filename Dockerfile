@@ -9,6 +9,7 @@ COPY . .
 RUN cargo install --path .
 
 FROM alpine:latest
+LABEL org.opencontainers.image.source https://github.com/eagletmt/aws-lambda-rie-gateway
 
 ENV GATEWAY_PORT=8080
 
