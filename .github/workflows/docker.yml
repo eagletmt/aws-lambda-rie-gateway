@@ -24,8 +24,9 @@ jobs:
           docker pull $IMAGE_ID:latest || true
 
       - name: Build image
-        run: docker build . --tag stage-builder --target builder --cache-from $IMAGE_ID:stage-builder
-        run: docker build . --tag $IMAGE_NAME --cache-from stage-builder --cache-from $IMAGE_ID:latest
+        run: |
+          docker build . --tag stage-builder --target builder --cache-from $IMAGE_ID:stage-builder
+          docker build . --tag $IMAGE_NAME --cache-from stage-builder --cache-from $IMAGE_ID:latest
 
       - name: Log into registry
         run: echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
