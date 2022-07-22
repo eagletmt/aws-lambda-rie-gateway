@@ -8,8 +8,10 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
+aws_lambda_events = { version = "0.6.3", features = ["apigw"] }
 base64 = "0.13"
 bytes = "1.0"
+chrono = "0.4.19"
 env_logger = "0.8"
 futures = "0.3"
 hyper = { version = "0.14", features = ["http1", "server", "stream", "runtime"] }
