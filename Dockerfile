@@ -1,4 +1,4 @@
-FROM rust:1.61-alpine as builder
+FROM public.ecr.aws/docker/library/rust:1.61-alpine as builder
 
 RUN apk add --no-cache musl-dev
 
@@ -10,8 +10,7 @@ RUN mkdir -p src/bin && echo 'fn main() {}' > src/bin/dummy.rs && cargo build --
 COPY src ./src/
 RUN cargo build --release --locked --frozen
 
-FROM alpine:latest
-LABEL org.opencontainers.image.source https://github.com/eagletmt/aws-lambda-rie-gateway
+FROM public.ecr.aws/docker/library/alpine:latest
 
 ENV BIND 0.0.0.0:8080
 

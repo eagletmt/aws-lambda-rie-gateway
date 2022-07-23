@@ -8,14 +8,22 @@ on:
       - v*
 
 env:
-  IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/aws-lambda-rie-gateway
+  IMAGE_REPO: public.ecr.aws/eagletmt/aws-lambda-rie-gateway
 
 jobs:
   push:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'create'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::274147449864:role/GHAAwsLambdaRieGateway
+
+      - name: Log into registry
+        run: aws ecr-public get-login-password --region us-east-1 | docker login -u AWS --password-stdin public.ecr.aws
 
       - name: Pull images for caching
         run: |
@@ -27,10 +35,7 @@ jobs:
           docker build . --tag $IMAGE_REPO:stage-builder --target builder --cache-from $IMAGE_REPO:stage-builder
           docker build . --tag $IMAGE_REPO:latest --cache-from $IMAGE_REPO:stage-builder --cache-from $IMAGE_REPO:latest
 
-      - name: Log into registry
-        run: echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Push image to GitHub Container Registry
+      - name: Push image
         run: |
           # Strip git ref prefix from version
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
