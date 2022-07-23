@@ -1,5 +1,12 @@
+use chrono::Utc;
 use futures::stream::TryStreamExt as _;
 use structopt::StructOpt as _;
+use aws_lambda_events::apigw::{
+    ApiGatewayV2httpRequest,
+    ApiGatewayV2httpRequestContext,
+    ApiGatewayV2httpRequestContextHttpDescription,
+    ApiGatewayV2httpResponse,
+};
 
 #[derive(Debug, structopt::StructOpt)]
 struct Opt {
@@ -52,40 +59,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ApiGatewayV2LambdaProxyIntegrationV2<'a> {
-    version: &'a str,
-    raw_path: &'a str,
-    raw_query_string: Option<&'a str>,
-    headers: std::collections::HashMap<String, String>,
-    query_string_parameters: Option<std::collections::HashMap<String, String>>,
-    body: Option<String>,
-    is_base64_encoded: bool,
-    request_context: ApiGatewayV2LambdaProxyIntegrationV2RequestContext<'a>,
-}
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ApiGatewayV2LambdaProxyIntegrationV2RequestContext<'a> {
-    http: ApiGatewayV2LambdaProxyIntegrationV2RequestContextHttp<'a>,
-}
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ApiGatewayV2LambdaProxyIntegrationV2RequestContextHttp<'a> {
-    method: String,
-    path: &'a str,
-}
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ApiGatewayV2LambdaResponseV1 {
-    is_base64_encoded: bool,
-    status_code: u16,
-    #[serde(default)]
-    headers: std::collections::HashMap<String, String>,
-    body: String,
-}
-
 async fn handle(
     target_url: String,
     request: hyper::Request<hyper::Body>,
@@ -96,44 +69,66 @@ async fn handle(
         for (k, v) in u.query_pairs() {
             params.insert(k.into_owned(), v.into_owned());
         }
-        Some(params)
+        params
     } else {
-        None
+        std::collections::HashMap::new()
     };
     let method = request.method().clone();
     let uri = request.uri().clone();
-    let mut headers = std::collections::HashMap::new();
-    for (k, v) in request.headers() {
-        headers.insert(k.as_str().to_owned(), v.to_str()?.to_owned());
-    }
+    let protocol = request.version();
+    let headers = request.headers().clone();
+
     let body = request
         .into_body()
         .map_ok(|b| bytes::BytesMut::from(&b[..]))
         .try_concat()
         .await?;
-    let payload = ApiGatewayV2LambdaProxyIntegrationV2 {
-        version: "2.0",
-        raw_path: uri.path(),
-        raw_query_string: uri.query(),
-        headers,
-        query_string_parameters,
+
+    let datetime = Utc::now();
+
+    let payload = ApiGatewayV2httpRequest {
+        version: Some("2.0".to_owned()),
+        route_key: None,
+        raw_path: Some(uri.path().to_owned()),
+        raw_query_string: uri.query().map(|s| s.to_owned()),
+        cookies: None,
+        headers: headers.clone(),
+        query_string_parameters: query_string_parameters.into(),
+        path_parameters: std::collections::HashMap::new(),
+        request_context: ApiGatewayV2httpRequestContext {
+            route_key: Some("$default".to_owned()),
+            account_id: Some(String::new()),
+            stage: Some("$default".to_owned()),
+            request_id: Some(String::new()),
+            authorizer: None,
+            apiid: Some(String::new()),
+            domain_name: Some(String::new()),
+            domain_prefix: Some(String::new()),
+            http: ApiGatewayV2httpRequestContextHttpDescription {
+                method,
+                path: Some(uri.path().to_owned()),
+                protocol: Some(format!("{:?}", protocol)),
+                source_ip: None,
+                user_agent: None,
+            },
+            authentication: None,
+            time: Some(datetime.format("%d/%b/%Y:%T %z").to_string()),
+            time_epoch: datetime.timestamp_millis(),
+        },
+        stage_variables: std::collections::HashMap::new(),
         body: if body.is_empty() {
             None
         } else {
             Some(base64::encode(&body))
         },
         is_base64_encoded: true,
-        request_context: ApiGatewayV2LambdaProxyIntegrationV2RequestContext {
-            http: ApiGatewayV2LambdaProxyIntegrationV2RequestContextHttp {
-                method: format!("{}", method),
-                path: uri.path(),
-            },
-        },
     };
+
     log::info!(
         "Send upstream request: {}",
         serde_json::to_string(&payload)?
     );
+
     let resp = reqwest::Client::new()
         .post(&format!(
             "{}/2015-03-31/functions/function/invocations",
@@ -142,12 +137,24 @@ async fn handle(
         .json(&payload)
         .send()
         .await?;
-    let lambda_response: ApiGatewayV2LambdaResponseV1 = resp.json().await?;
+
+    let lambda_response: ApiGatewayV2httpResponse = resp.json().await
+        .map_err(|e| {
+            log::error!("{e}");
+            e
+        })?;
     log::info!("Received upstream response: {:?}", lambda_response);
 
-    let mut builder = hyper::Response::builder().status(lambda_response.status_code);
-    for (k, v) in lambda_response.headers {
-        builder = builder.header(k.as_bytes(), v);
-    }
-    Ok(builder.body(hyper::Body::from(lambda_response.body))?)
+    let status = hyper::StatusCode::from_u16(lambda_response.status_code as u16)?;
+    let mut builder = hyper::Response::builder().status(status);
+    let headers = builder.headers_mut().unwrap();
+    *headers = lambda_response.headers;
+
+    let body: Vec<u8> = if let Some(body) = lambda_response.body {
+        body.as_ref().into()
+    } else {
+        Vec::new()
+    };
+
+    Ok(builder.body(hyper::Body::from(body))?)
 }
