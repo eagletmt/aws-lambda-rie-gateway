@@ -1,12 +1,10 @@
+use aws_lambda_events::apigw::{
+    ApiGatewayV2httpRequest, ApiGatewayV2httpRequestContext,
+    ApiGatewayV2httpRequestContextHttpDescription, ApiGatewayV2httpResponse,
+};
 use chrono::Utc;
 use futures::stream::TryStreamExt as _;
 use structopt::StructOpt as _;
-use aws_lambda_events::apigw::{
-    ApiGatewayV2httpRequest,
-    ApiGatewayV2httpRequestContext,
-    ApiGatewayV2httpRequestContextHttpDescription,
-    ApiGatewayV2httpResponse,
-};
 
 #[derive(Debug, structopt::StructOpt)]
 struct Opt {
@@ -138,11 +136,10 @@ async fn handle(
         .send()
         .await?;
 
-    let lambda_response: ApiGatewayV2httpResponse = resp.json().await
-        .map_err(|e| {
-            log::error!("{e}");
-            e
-        })?;
+    let lambda_response: ApiGatewayV2httpResponse = resp.json().await.map_err(|e| {
+        log::error!("{e}");
+        e
+    })?;
     log::info!("Received upstream response: {:?}", lambda_response);
 
     let status = hyper::StatusCode::from_u16(lambda_response.status_code as u16)?;
