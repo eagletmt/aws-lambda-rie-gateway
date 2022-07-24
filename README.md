@@ -11,7 +11,7 @@ Convert HTTP request to API Gateway payload for [aws-lambda-rie](https://github.
 
 # Usage Docker Image
 ## From container registry
-1. Run `docker run --rm --env TARGET_URL=http://rie_app:8080 --publish 8080:8080 ghcr.io/eagletmt/aws-lambda-rie-gateway`
+1. Run `docker run --rm --env TARGET_URL=http://rie_app:8080 --publish 8080:8080 public.ecr.aws/eagletmt/aws-lambda-rie-gateway`
 
 ## From source
 1. Clone this repository
