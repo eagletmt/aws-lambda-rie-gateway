@@ -51,7 +51,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_graceful_shutdown(async {
         let _ = tokio::signal::ctrl_c().await;
         log::info!("Shutting down...");
-        ()
     });
     server.await?;
     Ok(())
