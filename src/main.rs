@@ -3,26 +3,16 @@ use aws_lambda_events::apigw::{
     ApiGatewayV2httpRequestContextHttpDescription, ApiGatewayV2httpResponse,
 };
 use chrono::Utc;
+use clap::Parser as _;
 use futures::stream::TryStreamExt as _;
-use structopt::StructOpt as _;
 
-#[derive(Debug, structopt::StructOpt)]
+#[derive(Debug, clap::Parser)]
 struct Opt {
-    #[structopt(
-        short,
-        long,
-        env,
-        default_value = "127.0.0.1:8080",
-        about = "Bind address"
-    )]
+    /// Bind address
+    #[clap(short, long, env, default_value = "127.0.0.1:8080")]
     bind: String,
-    #[structopt(
-        short,
-        long,
-        env,
-        default_value = "http://localhost:9000",
-        about = "Target root URL of RIE"
-    )]
+    /// Target root URL of RIE
+    #[clap(short, long, env, default_value = "http://localhost:9000")]
     target_url: String,
 }
 
@@ -35,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .from_env_lossy(),
         )
         .init();
-    let Opt { bind, target_url } = Opt::from_args();
+    let Opt { bind, target_url } = Opt::parse();
 
     let make_service = hyper::service::make_service_fn(move |_| {
         let target_url = target_url.clone();
