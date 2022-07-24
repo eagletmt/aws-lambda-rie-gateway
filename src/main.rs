@@ -28,7 +28,13 @@ struct Opt {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .init();
     let Opt { bind, target_url } = Opt::from_args();
 
     let make_service = hyper::service::make_service_fn(move |_| {
@@ -40,17 +46,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
     let server = if let Some(listener) = listenfd::ListenFd::from_env().take_tcp_listener(0)? {
-        log::info!("Listen {}", listener.local_addr()?);
+        tracing::info!("Listen {}", listener.local_addr()?);
         hyper::server::Server::from_tcp(listener)?
     } else {
         let addr = bind.parse()?;
-        log::info!("Listen {}", addr);
+        tracing::info!("Listen {}", addr);
         hyper::server::Server::bind(&addr)
     }
     .serve(make_service)
     .with_graceful_shutdown(async {
         let _ = tokio::signal::ctrl_c().await;
-        log::info!("Shutting down...");
+        tracing::info!("Shutting down...");
     });
     server.await?;
     Ok(())
@@ -121,7 +127,7 @@ async fn handle(
         is_base64_encoded: true,
     };
 
-    log::info!(
+    tracing::info!(
         "Send upstream request: {}",
         serde_json::to_string(&payload)?
     );
@@ -136,10 +142,10 @@ async fn handle(
         .await?;
 
     let lambda_response: ApiGatewayV2httpResponse = resp.json().await.map_err(|e| {
-        log::error!("{e}");
+        tracing::error!("{e}");
         e
     })?;
-    log::info!("Received upstream response: {:?}", lambda_response);
+    tracing::info!("Received upstream response: {:?}", lambda_response);
 
     let status = hyper::StatusCode::from_u16(lambda_response.status_code as u16)?;
     let mut builder = hyper::Response::builder().status(status);
