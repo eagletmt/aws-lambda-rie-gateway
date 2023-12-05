@@ -158,7 +158,10 @@ async fn handle(
                         Ok(builder.body(hyper::Body::from(decoded_bytes))?)
                     }
                     Err(e) => {
-                        tracing::warn!("Lambda response signaled it was base64, but could not decode it: {}", e);
+                        tracing::warn!(
+                            "Lambda response signaled it was base64, but could not decode it: {}",
+                            e
+                        );
                         Ok(builder.body(hyper::Body::from(body))?)
                     }
                 }
@@ -166,8 +169,6 @@ async fn handle(
                 Ok(builder.body(hyper::Body::from(body))?)
             }
         }
-        None => {
-            Ok(builder.body(hyper::Body::from(body))?)
-        }
+        None => Ok(builder.body(hyper::Body::from(body))?),
     }
 }
