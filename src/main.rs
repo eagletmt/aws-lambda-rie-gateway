@@ -2,6 +2,7 @@ use aws_lambda_events::apigw::{
     ApiGatewayV2httpRequest, ApiGatewayV2httpRequestContext,
     ApiGatewayV2httpRequestContextHttpDescription, ApiGatewayV2httpResponse,
 };
+use base64::decode;
 use chrono::Utc;
 use clap::Parser as _;
 use futures::stream::TryStreamExt as _;
@@ -148,5 +149,26 @@ async fn handle(
         Vec::new()
     };
 
-    Ok(builder.body(hyper::Body::from(body))?)
+    match lambda_response.is_base64_encoded {
+        Some(value) => {
+            if value {
+                match decode(&body) {
+                    Ok(decoded_bytes) => {
+                        // Use the decoded bytes as needed
+                        Ok(builder.body(hyper::Body::from(decoded_bytes))?)
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Lambda response signaled it was base64, but could not decode it: {}",
+                            e
+                        );
+                        Ok(builder.body(hyper::Body::from(body))?)
+                    }
+                }
+            } else {
+                Ok(builder.body(hyper::Body::from(body))?)
+            }
+        }
+        None => Ok(builder.body(hyper::Body::from(body))?),
+    }
 }
