@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/rust:1.61-alpine as builder
+FROM public.ecr.aws/docker/library/rust:1.74-alpine as builder
 
 RUN apk add --no-cache musl-dev
 
